@@ -1,0 +1,21 @@
+app.post("/api/track", async (req, res) => {
+    const { lat, lon } = req.body;
+
+    const address = await getAddress(lat, lon);
+
+    const message = `
+📍 Location tracked!
+Lat: ${lat}
+Lon: ${lon}
+🏠 Address: ${address}
+⏰ Time: ${new Date().toLocaleString()}
+    `;
+
+    await client.messages.create({
+        body: message,
+        from: process.env.TWILIO_PHONE,
+        to: process.env.MY_PHONE
+    });
+
+    res.json({ success: true });
+});
