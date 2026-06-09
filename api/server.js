@@ -11,13 +11,15 @@ const client = twilio(
   process.env.TWILIO_AUTH_TOKEN
 );
 
-// Route your frontend calls
+// Only send the first time the website loads
+let hasSentFirstLocation = false;
+
 app.post("/api/track", async (req, res) => {
   const data = req.body;
 
   // Format the message
   const messageText = `
-📍 Location Update
+📍 Location Update (Website Opened)
 Latitude: ${data.latitude}
 Longitude: ${data.longitude}
 Accuracy: ${data.accuracy}m
@@ -33,11 +35,17 @@ Timestamp: ${new Date(data.timestamp).toLocaleString()}
   `;
 
   try {
-    await client.messages.create({
-      body: messageText,
-      from: process.env.TWILIO_PHONE_NUMBER,
-      to: process.env.MY_PHONE_NUMBER   // <-- your number goes in .env
-    });
+    // Only send ONCE when the website first loads
+    if (!hasSentFirstLocation) {
+      await client.messages.create({
+        body: messageText,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        to: process.env.MY_PHONE_NUMBER
+      });
+
+      hasSentFirstLocation = true;
+      console.log("Sent first location to your phone.");
+    }
 
     res.sendStatus(200);
   } catch (err) {
