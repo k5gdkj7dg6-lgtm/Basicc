@@ -1,55 +1,49 @@
-import express from "express";
-import bodyParser from "body-parser";
-import twilio from "twilio";
-import fetch from "node-fetch";
-import dotenv from "dotenv";
-
-dotenv.config();
+require("dotenv").config();
+const express = require("express");
+const twilio = require("twilio");
 
 const app = express();
-app.use(bodyParser.json());
+app.use(express.json());
 
 // Twilio client
-const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH);
+const client = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
 
-// Reverse geocode function
-async function getAddress(lat, lon) {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${process.env.GOOGLE_API}`;
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (data.results.length > 0) {
-        return data.results[0].formatted_address;
-    }
-    return "Address not found";
-}
-
-// Main route your index.html calls
+// Route your frontend calls
 app.post("/api/track", async (req, res) => {
-    const { lat, lon } = req.body;
+  const data = req.body;
 
-    try {
-        const address = await getAddress(lat, lon);
+  // Format the message
+  const messageText = `
+📍 Location Update
+Latitude: ${data.latitude}
+Longitude: ${data.longitude}
+Accuracy: ${data.accuracy}m
+Speed: ${data.speed}
+Heading: ${data.heading}
+Altitude: ${data.altitude}
 
-        const message = `
-📍 Location tracked!
-Lat: ${lat}
-Lon: ${lon}
-🏠 Address: ${address}
-⏰ Time: ${new Date().toLocaleString()}
-        `;
+UTM Zone: ${data.utm.zone}
+Easting: ${data.utm.easting}
+Northing: ${data.utm.northing}
 
-        await client.messages.create({
-            body: message,
-            from: process.env.TWILIO_PHONE,
-            to: process.env.MY_PHONE
-        });
+Timestamp: ${new Date(data.timestamp).toLocaleString()}
+  `;
 
-        res.json({ success: true });
-    } catch (err) {
-        console.error("Error sending SMS:", err);
-        res.json({ success: false });
-    }
+  try {
+    await client.messages.create({
+      body: messageText,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: process.env.MY_PHONE_NUMBER   // <-- your number goes in .env
+    });
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("Twilio error:", err);
+    res.sendStatus(500);
+  }
 });
 
 app.listen(3000, () => console.log("Server running on port 3000"));
